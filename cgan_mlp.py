@@ -44,10 +44,9 @@ class Discriminator:
                 outputs = tf.layers.dense(outputs,self.h_dim,activation = tf.nn.relu,trainable = training)
             with tf.variable_scope('dense2'):
                 outputs_logits = tf.layers.dense(outputs,1,trainable = training)
-                outputs_prob = tf.nn.sigmoid(outputs_logits)
         self.reuse = True
         self.variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,scope = 'd')
-        return outputs_prob,outputs_logits
+        return outputs_logits
 
 
 class CGANMLP:
@@ -69,8 +68,8 @@ class CGANMLP:
             dict of each models loss.
         """
         generated = self.g(self.z,y_in,training = True)
-        d_real,d_logits_real = self.d(x_in,y_in,training = True,name = 'd')
-        d_fake,d_logits_fake = self.d(generated,y_in,training = True,name = 'g')
+        d_logits_real = self.d(x_in,y_in,training = True,name = 'd')
+        d_logits_fake = self.d(generated,y_in,training = True,name = 'g')
 
         d_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=d_logits_real,labels = tf.ones_like(d_logits_real)))
         d_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=d_logits_fake,labels = tf.zeros_like(d_logits_fake)))
@@ -140,18 +139,19 @@ def mnisttrain():
 
 def mnisttest():
     batch_size = 128
-    cgan = CGANMLP()
 
     with tf.Session() as sess:
-        saver = tf.train.Saver()
-        sess.run(tf.global_variables_initializer())
-        saver.restore(sess,os.path.join('./model','model.ckpt'))
-
+        cgan = CGANMLP()
         label = random.randint(0,9)
         y_input = tf.one_hot(label,depth = 10)
         y_titl = tf.tile(y_input,[batch_size])
         y_input = tf.reshape(y_titl,[batch_size,10])
         images = cgan.sample_images(y_input)
+
+        saver = tf.train.Saver()
+        sess.run(tf.global_variables_initializer())
+        saver.restore(sess,os.path.join('./model','model.ckpt'))
+
         generated = sess.run(images)
         with open('train%d.jpg'%label,'wb')as f:
             f.write(generated)
