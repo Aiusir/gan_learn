@@ -50,7 +50,7 @@ class Discriminator:
                 outputs = tf.layers.conv2d(inputs, self.depths[0], [5, 5], strides=(2, 2), padding='SAME')
                 outputs = leaky_relu(tf.layers.batch_normalization(outputs, training=training), name='outputs')
             with tf.variable_scope('conv2'):
-                outputs = tf.layers.conv2d(inputs, self.depths[1], [5, 5], strides=(2, 2), padding='SAME')
+                outputs = tf.layers.conv2d(outputs, self.depths[1], [5, 5], strides=(2, 2), padding='SAME')
                 outputs = leaky_relu(tf.layers.batch_normalization(outputs, training=training), name='outputs')
             with tf.variable_scope('classify'):
                 reshape = tf.reshape(outputs, [self.batch_size, -1])
