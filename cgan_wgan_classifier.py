@@ -37,30 +37,54 @@ class Discriminator:
         self.depths= depths
         self.x_size = x_size
 
-    def __call__(self,x,y,training=False,name=''):
+    def __call__(self,x,training=False,name=''):
         def leaky_relu(x, leak=0.2, name=''):
             return tf.maximum(x, x * leak, name=name)
-        y_dim = y.get_shape().as_list()[1]
-        y = tf.reshape(y,[self.batch_size,1,1,y_dim])
         x = tf.reshape(x,[self.batch_size,self.x_size[0],self.x_size[1],-1])
-        inputs = tf.concat([x,y*tf.ones([self.batch_size,self.x_size[0],self.x_size[1],y_dim])],3)
         with tf.name_scope('d'+name), tf.variable_scope('d',reuse = self.reuse):
             # reshape from inputs
             with tf.variable_scope('conv1'):
-                outputs = tf.layers.conv2d(inputs, self.depths[0], [5, 5], strides=(2, 2), padding='SAME')
+                outputs = tf.layers.conv2d(x, self.depths[0], [5, 5], strides=(2, 2), padding='SAME')
                 outputs = leaky_relu(tf.layers.batch_normalization(outputs, training=training), name='outputs')
             with tf.variable_scope('conv2'):
                 outputs = tf.layers.conv2d(outputs, self.depths[1], [5, 5], strides=(2, 2), padding='SAME')
                 outputs = leaky_relu(tf.layers.batch_normalization(outputs, training=training), name='outputs')
-            with tf.variable_scope('classify'):
+            with tf.variable_scope('dense'):
                 reshape = tf.reshape(outputs, [self.batch_size, -1])
                 outputs_logits = tf.layers.dense(reshape, 1, name='outputs')
         self.reuse = True
         self.variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,scope = 'd')
         return outputs_logits
 
+class CLASSIFIER:
+    def __init__(self,batch_size=128,depths = [64,128],x_size=(28,28)):
+        self.reuse = False
+        self.batch_size = batch_size
+        self.depths= depths
+        self.x_size = x_size
 
-class CGANCONV:
+    def __call__(self,x,training=False,name=''):
+        def leaky_relu(x, leak=0.2, name=''):
+            return tf.maximum(x, x * leak, name=name)
+        x = tf.reshape(x,[self.batch_size,self.x_size[0],self.x_size[1],-1])
+        with tf.name_scope('c'+name), tf.variable_scope('c',reuse = self.reuse):
+            # reshape from inputs
+            with tf.variable_scope('conv1'):
+                outputs = tf.layers.conv2d(x, self.depths[0], [5, 5], strides=(2, 2),activation = tf.nn.relu, padding='SAME')
+            with tf.variable_scope('conv2'):
+                outputs = tf.layers.conv2d(outputs, self.depths[1], [5, 5], strides=(2, 2), padding='SAME')
+                outputs = leaky_relu(tf.layers.batch_normalization(outputs, training=training), name='outputs')
+            with tf.variable_scope('dense1'):
+                reshape = tf.reshape(outputs, [self.batch_size, -1])
+                outputs = tf.layers.dense(reshape, 1024,activation = tf.nn.relu, name='outputs')
+            with tf.variable_scope('dense2'):
+                outputs = tf.layers.dense(outputs, 10, name='outputs')
+        self.reuse = True
+        self.variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,scope = 'c')
+        return outputs
+
+
+class CGANWGANCLASSIFIER:
     def __init__(self,batch_size=128,
                     g_depths = [128,64,1],
                     d_depths = [64,128],
@@ -72,6 +96,7 @@ class CGANCONV:
         self.g = Generator(batch_size=self.batch_size,x_size = self.x_size,depths = g_depths)
         self.d = Discriminator(batch_size=self.batch_size,depths = d_depths)
         self.z = tf.random_uniform([self.batch_size,self.z_dim],minval = -1.0,maxval = 1.0)
+        self.c = CLASSIFIER(batch_size=self.batch_size,depths = d_depths)
     
     def loss(self,x_in,y_in):
         """build model,calculate losses.
@@ -82,26 +107,29 @@ class CGANCONV:
             dict of each models loss.
         """
         generated = self.g(self.z,y_in,training = True)
-        d_logits_real = self.d(x_in,y_in,training = True,name = 'd')
-        d_logits_fake = self.d(generated,y_in,training = True,name = 'g')
+        d_logits_real = self.d(x_in,training = True,name = 'd')
+        d_logits_fake = self.d(generated,training = True,name = 'g')
+        c_logits_real = self.c(x_in,training=True,name = 'cr')
+        c_logits_fake = self.c(generated,training=True,name = 'cf')
 
-        d_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=d_logits_real,labels = tf.ones_like(d_logits_real)))
-        d_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=d_logits_fake,labels = tf.zeros_like(d_logits_fake)))
-        d_loss = d_loss_fake+d_loss_real
-        g_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=d_logits_fake,labels = tf.ones_like(d_logits_fake)))
-        return {self.g:g_loss,self.d:d_loss}
+        d_loss = -tf.reduce_mean(d_logits_real) + tf.reduce_mean(d_logits_fake)
+        g_loss = -tf.reduce_mean(d_logits_fake)
+        c_loss_real = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits = c_logits_real,labels = y_in)) 
+        c_loss_fake = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits = c_logits_fake,labels = y_in))
+        return {self.g:g_loss,self.d:d_loss,self.c:[c_loss_real,c_loss_fake]}
 
-    def train(self,losses,learning_rate = 0.0002):
+    def train(self,losses,learning_rate = 5e-5):
         """
         Args:
             losses dict
         Returns:
             train op.
         """
-        d_opt_op = tf.train.AdamOptimizer(learning_rate).minimize(losses[self.d],var_list = self.d.variables)
-        g_opt_op = tf.train.AdamOptimizer(learning_rate).minimize(losses[self.g],var_list = self.g.variables)
+        d_opt_op = tf.train.RMSPropOptimizer(learning_rate).minimize(losses[self.d],var_list = self.d.variables)
+        g_opt_op = tf.train.RMSPropOptimizer(learning_rate).minimize(losses[self.g]+losses[self.c][1],var_list = self.g.variables)
+        c_opt_real_op = tf.train.AdamOptimizer(learning_rate).minimize(losses[self.c][0],var_list = self.c.variables)
 
-        with tf.control_dependencies([g_opt_op,d_opt_op]):
+        with tf.control_dependencies([g_opt_op,d_opt_op,c_opt_real_op]):
             return tf.no_op(name = 'train')
 
     def sample_images(self,inputs_y,x_size=(28,28),row=8,col =8,inputs = None):
@@ -122,7 +150,7 @@ def mnisttrain():
     batch_size = 128
     mnist = input_data.read_data_sets('MNIST_data',one_hot=True)
 
-    cgan = CGANCONV()
+    cgan = CGANWGANCLASSIFIER()
     x_data = tf.placeholder(tf.float32,[batch_size,28*28],name = 'x_data')
     y_data = tf.placeholder(tf.float32,[batch_size,10],name = 'y_data')
 
@@ -135,10 +163,10 @@ def mnisttrain():
 
         for step in range(10000):
             x_in,y_in = mnist.train.next_batch(batch_size)
-            _,g_loss_value,d_loss_value = sess.run([train_op,losses[cgan.g],losses[cgan.d]],feed_dict = {x_data:x_in,y_data:y_in})
+            _,g_loss_value,d_loss_value,c_loss_value = sess.run([train_op,losses[cgan.g],losses[cgan.d],losses[cgan.c]],feed_dict = {x_data:x_in,y_data:y_in})
 
             if step%1000==0:
-                print step,g_loss_value,d_loss_value
+                print step,g_loss_value,d_loss_value,c_loss_value
 
             if step%10000==0:
                 label = random.randint(0,9)
@@ -155,7 +183,7 @@ def mnisttest():
     batch_size = 128
 
     with tf.Session() as sess:
-        cgan = CGANCONV()
+        cgan = CGANWGANCLASSIFIER()
         label = random.randint(0,9)
         y_input = tf.one_hot(label,depth = 10)
         y_titl = tf.tile(y_input,[batch_size])

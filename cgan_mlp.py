@@ -90,10 +90,10 @@ class CGANMLP:
         with tf.control_dependencies([g_opt_op,d_opt_op]):
             return tf.no_op(name = 'train')
 
-    def sample_images(self,inputs_z,x_size=(28,28),row=8,col =8,inputs = None):
+    def sample_images(self,inputs_y,x_size=(28,28),row=8,col =8,inputs = None):
         if inputs is None:
             inputs = self.z
-        imgs = self.g(inputs,inputs_z,training = True)
+        imgs = self.g(inputs,inputs_y,training = True)
         imgs = tf.reshape(imgs,[self.batch_size,x_size[0],x_size[1],1])
         imgs = tf.image.convert_image_dtype(imgs,tf.uint8)
         imgs = [img for img in tf.split(imgs,self.batch_size,axis = 0)]
