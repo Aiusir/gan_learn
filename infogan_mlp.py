@@ -30,9 +30,9 @@ class Generator:
             with tf.variable_scope('reshape'):
                 outputs = tf.reshape(inputs,[self.batch_size,-1])
             with tf.variable_scope('dense1'):
-                outputs = tf.layers.dense(outputs,self.h_dim,activation = tf.nn.relu,trainable = training)
+                outputs = tf.layers.dense(outputs,self.h_dim,activation = tf.nn.relu,kernel_initializer = tf.random_normal_initializer(0,0.02),trainable = training)
             with tf.variable_scope('dense2'):
-                outputs = tf.layers.dense(outputs,self.x_size[0]*self.x_size[1],activation = tf.nn.sigmoid,trainable = training)
+                outputs = tf.layers.dense(outputs,self.x_size[0]*self.x_size[1],activation = tf.nn.sigmoid,kernel_initializer = tf.random_normal_initializer(0,0.02),trainable = training)
         self.reuse = True
         self.variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,scope = 'g')
         return outputs
@@ -51,10 +51,10 @@ class Discriminator:
             with tf.variable_scope('reshape'):
                 outputs = tf.reshape(inputs,[self.batch_size,-1])
             with tf.variable_scope('dense1'):
-                outputs = tf.layers.dense(outputs,self.h_dim,activation = tf.nn.relu,trainable = training)
+                outputs = tf.layers.dense(outputs,self.h_dim,activation = tf.nn.relu,kernel_initializer = tf.random_normal_initializer(0,0.02),trainable = training)
             with tf.variable_scope('dense2'):
-                outputs_logits = tf.layers.dense(outputs,1,trainable = training)
-                outputs_labels = tf.layers.dense(outputs,10)
+                outputs_logits = tf.layers.dense(outputs,1,kernel_initializer = tf.random_normal_initializer(0,0.02),trainable = training)
+                outputs_labels = tf.layers.dense(outputs,10,kernel_initializer = tf.random_normal_initializer(0,0.02))
         self.reuse = True
         self.variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,scope = 'd')
         return outputs_logits,outputs_labels
@@ -117,10 +117,10 @@ class INFOGANMLP:
         return tf.image.encode_jpeg(tf.squeeze(img,[0]))
 
 def mnisttrain():
-    batch_size = 128
+    batch_size = 64
     mnist = input_data.read_data_sets('MNIST_data',one_hot=True)
 
-    infogan = INFOGANMLP()
+    infogan = INFOGANMLP(batch_size=batch_size)
     x_data = tf.placeholder(tf.float32,[batch_size,28*28],name = 'x_data')
     y_data = tf.placeholder(tf.float32,[batch_size,10],name = 'y_data')
     z_data = tf.placeholder(tf.float32,[batch_size,100],name = 'z_data')
