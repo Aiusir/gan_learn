@@ -18,9 +18,9 @@ class Generator:
             with tf.variable_scope('reshape'):
                 outputs = tf.reshape(inputs,[self.batch_size,-1])
             with tf.variable_scope('dense1'):
-                outputs = tf.layers.dense(outputs,self.h_dim,activation = tf.nn.relu,trainable = training)
+                outputs = tf.layers.dense(outputs,self.h_dim,activation = tf.nn.relu,kernel_initializer = tf.random_normal_initializer(0,0.02),trainable = training)
             with tf.variable_scope('dense2'):
-                outputs = tf.layers.dense(outputs,self.x_size[0]*self.x_size[1],activation = tf.nn.sigmoid,trainable = training)
+                outputs = tf.layers.dense(outputs,self.x_size[0]*self.x_size[1],activation = tf.nn.sigmoid,kernel_initializer = tf.random_normal_initializer(0,0.02),trainable = training)
         self.reuse = True
         self.variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,scope = 'g')
         return outputs
@@ -39,9 +39,9 @@ class Discriminator:
             with tf.variable_scope('reshape'):
                 outputs = tf.reshape(inputs,[self.batch_size,-1])
             with tf.variable_scope('dense1'):
-                outputs = tf.layers.dense(outputs,self.h_dim,activation = tf.nn.relu,trainable = training)
+                outputs = tf.layers.dense(outputs,self.h_dim,activation = tf.nn.relu,kernel_initializer = tf.random_normal_initializer(0,0.02),trainable = training)
             with tf.variable_scope('dense2'):
-                outputs_logits = tf.layers.dense(outputs,1,trainable = training)
+                outputs_logits = tf.layers.dense(outputs,1,kernel_initializer = tf.random_normal_initializer(0,0.02),trainable = training)
         self.reuse = True
         self.variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,scope = 'd')
         return outputs_logits

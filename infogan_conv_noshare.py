@@ -30,14 +30,14 @@ class Generator:
         with tf.variable_scope('g',reuse = self.reuse):
             # reshape from inputs
             with tf.variable_scope('dense1'):
-                outputs = tf.layers.dense(inputs,(int)(self.x_size[0]/4)*(int)(self.x_size[1]/4)*self.depths[0],activation = tf.nn.relu,kernel_initializer = tf.random_normal_initializer(0,0.02),trainable = training)
+                outputs = tf.layers.dense(inputs,(int)(self.x_size[0]/4)*(int)(self.x_size[1]/4)*self.depths[0],activation = tf.nn.relu,trainable = training)
             with tf.variable_scope('reshape'):
                 outputs = tf.reshape(outputs,[self.batch_size,(int)(self.x_size[0]/4),(int)(self.x_size[1]/4),self.depths[0]])
             with tf.variable_scope('deconv1'):
-                outputs = tf.layers.conv2d_transpose(outputs, self.depths[1], [5, 5], strides=(2, 2),kernel_initializer = tf.random_normal_initializer(0,0.02), padding='SAME')
+                outputs = tf.layers.conv2d_transpose(outputs, self.depths[1], [5, 5], strides=(2, 2), padding='SAME')
                 outputs = tf.nn.relu(tf.layers.batch_normalization(outputs, training=training), name='outputs')
             with tf.variable_scope('deconv2'):
-                outputs = tf.layers.conv2d_transpose(outputs, self.depths[2], [5, 5], strides=(2, 2),activation = tf.nn.sigmoid,kernel_initializer = tf.random_normal_initializer(0,0.02), padding='SAME')
+                outputs = tf.layers.conv2d_transpose(outputs, self.depths[2], [5, 5], strides=(2, 2),activation = tf.nn.sigmoid, padding='SAME')
         self.reuse = True
         self.variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,scope = 'g')
         return outputs
@@ -64,7 +64,7 @@ class Discriminator:
                 outputs = leaky_relu(tf.layers.batch_normalization(outputs, training=training), name='outputs')
             with tf.variable_scope('classify'):
                 reshape = tf.reshape(outputs, [self.batch_size, -1])
-                outputs_logits = tf.layers.dense(reshape, 1, kernel_initializer = tf.random_normal_initializer(0,0.02),name='outputs1')
+                outputs_logits = tf.layers.dense(reshape, 1,name='outputs1')
                 outputs = tf.layers.dense(reshape, 128, name='outputs2')
                 outputs =  leaky_relu(tf.layers.batch_normalization(outputs, training=training), name='outputs3')
                 outputs_prob = tf.layers.dense(outputs, 10, name='outputs4')
@@ -92,7 +92,7 @@ class CLASSIFIER:
                 outputs = leaky_relu(tf.layers.batch_normalization(outputs, training=training), name='outputs')
             with tf.variable_scope('dense1'):
                 reshape = tf.reshape(outputs, [self.batch_size, -1])
-                outputs = tf.layers.dense(reshape, 1024,activation = tf.nn.relu,kernel_initializer = tf.random_normal_initializer(0,0.02), name='outputs')
+                outputs = tf.layers.dense(reshape, 1024,activation = tf.nn.relu, name='outputs')
             with tf.variable_scope('dense2'):
                 outputs = tf.layers.dense(outputs, 10, name='outputs')
         self.reuse = True
